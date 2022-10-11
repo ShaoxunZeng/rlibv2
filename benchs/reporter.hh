@@ -60,7 +60,7 @@ struct Reporter {
       timer.reset();
 
       RDMA_LOG(2) << "epoch @ " << epoch << ": thpt: " << res << " reqs/sec, "
-                  << "bandwidht: " << bw / (1024L * 1024 * 1024) * 8 << " Gbps;"
+                  << "bandwidht: " << bw / (1024L * 1024 * 1024) << " GB/s;"
                   << passed_msec << " msec passed since last epoch.";
     }
     return 0.0;

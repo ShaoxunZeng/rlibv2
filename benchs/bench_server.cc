@@ -1,6 +1,7 @@
 #include <gflags/gflags.h>
 
 #include "../core/lib.hh"
+#include "./bench.hh"
 
 DEFINE_int64(port, 8888, "Server listener (UDP) port.");
 DEFINE_int64(use_nic_idx, 0, "Which NIC to create QP");
@@ -33,10 +34,11 @@ int main(int argc, char **argv) {
     {
       for (uint i = 0; i < RNicInfo::query_dev_names().size(); ++i)
         // allocate a memory (with 20M) so that remote QP can access it
-        RDMA_ASSERT(ctrl.registered_mrs.create_then_reg(
-            i, Arc<RMem>(new RMem(1024 * 1024 * 64)),
-            ctrl.opened_nics.query(i).value())) << "reg mem at: " << i << " error";
-      }
+        for (uint j = 0; j < CLIENT_THREAD_NUM; ++j)
+          RDMA_ASSERT(ctrl.registered_mrs.create_then_reg(
+              i * CLIENT_THREAD_NUM + j, Arc<RMem>(new RMem(QUEUE_DEPTH * REQUEST_SIZE)),
+              ctrl.opened_nics.query(i).value())) << "reg mem at: " << i << " error";
+    }
 
     // initialzie the value so as client can sanity check its content
     u64 *reg_mem = (u64 *)(ctrl.registered_mrs.query(0)
