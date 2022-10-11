@@ -52,10 +52,11 @@ public:
     RDMA_ASSERT(rpc.register_handler(
         proto::FetchQPAttr,
         std::bind(&RCtrl::fetch_qp_attr_wrapper, this, std::placeholders::_1)));
-
+#ifdef DCT
     RDMA_ASSERT(rpc.register_handler(
         proto::FetchDCAttr,
         std::bind(&RCtrl::fetch_dc_attr_wrapper, this, std::placeholders::_1)));
+#endif
   }
 
   ~RCtrl() {
@@ -148,7 +149,7 @@ private:
     memcpy(req.name, req_o.value().name, ::rdmaio::qp::kMaxQPNameLen + 1);
     return fetch_qp_attr(req, 0);
   }
-
+#ifdef DCT
   ByteBuffer fetch_dc_attr_wrapper(const ByteBuffer &b) {
     auto req_o = ::rdmaio::Marshal::dedump<proto::QPReq>(b);
     if (!req_o)
@@ -158,6 +159,7 @@ private:
     memcpy(req.name, req_o.value().name, ::rdmaio::qp::kMaxQPNameLen + 1);
     return fetch_dc_attr(req, 0);
   }
+#endif
 
   /*!
     Given a RCReq, query its attribute from the QPs
@@ -176,6 +178,7 @@ public:
         {.status = proto::CallbackStatus::NotFound});
   }
 
+#ifdef DCT
   ByteBuffer fetch_dc_attr(const proto::RCReq &req, const u64 &key) {
     auto dc = registered_dcs.query(req.name);
     if (dc) {
@@ -187,6 +190,7 @@ public:
     return ::rdmaio::Marshal::dump<proto::DCReply>(
         {.status = proto::CallbackStatus::NotFound});
   }
+#endif
 
 private:
   /*!

@@ -161,7 +161,7 @@ public:
     }
     return Ok(std::make_pair(srq, std::string("")));
   }
-
+#ifdef DCT
   using CreateDCTRes_t = Result<std::pair<ibv_exp_dct *, std::string>>;
   static CreateDCTRes_t create_dct(Arc<RNic> nic,
                                    ibv_cq *cq, ibv_srq *srq,
@@ -228,6 +228,7 @@ public:
     }
     return Ok(std::make_pair(qp, std::string("")));
   }
+#endif
 };
 
 } // namespace qp

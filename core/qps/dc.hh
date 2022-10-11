@@ -1,4 +1,5 @@
 #pragma once
+#ifdef DCT
 
 #include "../rmem/handler.hh"
 
@@ -269,3 +270,4 @@ public:
 } // namespace qp
 
 } // namespace rdmaio
+#endif

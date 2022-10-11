@@ -16,7 +16,9 @@ const u32 kDcKey = 1024;
 
 class RC;
 class UD;
+#ifdef DCT
 class DC;
+#endif
 class DCTarget;
 class Impl;
 
@@ -123,7 +125,9 @@ private:
 
   friend class RC;
   friend class UD;
+#ifdef DCT
   friend class DC;
+#endif
   friend class DCTarget;
   friend class Impl;
 }; // class QPConfig

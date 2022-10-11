@@ -356,6 +356,7 @@ public:
     return ::rdmaio::Err(std::make_pair(err_str, ::rdmaio::qp::QPAttr()));
   }
 
+#ifdef DCT
   /*!
     Fetch remote DC node attr
    */
@@ -407,6 +408,7 @@ public:
   ErrCase:
     return ::rdmaio::Err(std::make_pair(err_str, ::rdmaio::qp::DCAttr()));
   }
+#endif
 };
 
 // a helper for hide wait_ready process

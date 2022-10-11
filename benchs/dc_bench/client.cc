@@ -1,3 +1,4 @@
+#ifdef DCT
 #include "../../core/lib.hh"
 #include "../../core/qps/op.hh"
 
@@ -174,3 +175,4 @@ worker_fn(const usize& worker_id, Statics* s)
     s->increment();
   }
 }
+#endif
