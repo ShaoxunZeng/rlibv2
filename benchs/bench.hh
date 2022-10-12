@@ -1,10 +1,13 @@
 #pragma once
 
 #define CLIENT_THREAD_NUM   1
-#define REQUEST_SIZE        128 * 1024
-#define QUEUE_DEPTH         128
+#define REQUEST_SIZE        (4 * 1024)
+#define QUEUE_DEPTH         256
 #define NIC_NUM             1
 #define TEST_TIME_SEC       30
+#define DOORBELL_BATCHING   16
+#define PIPELINE
+#define QP_NUM              2
 
 #define LOCAL_NIC(a) ((a) % NIC_NUM)
 #define REMOTE_NIC(a) ((a) % NIC_NUM)

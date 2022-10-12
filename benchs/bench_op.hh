@@ -1,5 +1,7 @@
 #pragma once
 
+ #include <sys/queue.h>
+
 #include "../core/qps/op.hh"
 #include "../tests/random.hh"
 
@@ -24,6 +26,8 @@ struct BenchOp : Op<NSGE> {
   u64 current_loff;
 
   u32 length;
+  u32 lkey;
+  u32 rkey;
 
  public:
   BenchOp<NSGE>(int type = 0, bool random = false) : Op<NSGE>() {
@@ -66,6 +70,7 @@ struct BenchOp : Op<NSGE> {
     this->rbuf_base = (u64)ra;
     this->rbuf_mod = mod;
     this->current_roff = 0;
+    this->rkey = rk;
     switch (type) {
       case RDMA_READ:
       case RDMA_WRITE:
@@ -90,6 +95,7 @@ struct BenchOp : Op<NSGE> {
     this->current_loff = 0;
     this->length = length;
     this->set_payload(la, length, lk);
+    this->lkey = lk;
     return *this;
   }
 

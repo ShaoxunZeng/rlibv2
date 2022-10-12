@@ -46,6 +46,7 @@ int main(int argc, char **argv) {
                                ->get_reg_attr()
                                .value()
                                .buf);
+    fprintf(stderr, "%p\n", reg_mem);
     // setup the value
     for (uint i = 0; i < 10000; ++i) {
         reg_mem[i] = FLAGS_magic_num + i;

@@ -10,7 +10,7 @@ namespace qp {
 
 const u32 kDefaultQKey = 0x111111;
 const u32 kDefaultPSN = 3185;
-const u32 kRcMaxSendSz = 128;
+const u32 kRcMaxSendSz = 512;
 const u32 kRcMaxRecvSz = 2048;
 const u32 kDcKey = 1024;
 

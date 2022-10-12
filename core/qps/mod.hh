@@ -111,12 +111,18 @@ public:
 
   /*!
     Poll one completion from the send_cq
+    \note send cq and recv cq may be the same by default
    */
   inline std::pair<int,ibv_wc> poll_send_comp() {
     ibv_wc wc;
     auto poll_result = ibv_poll_cq(cq, 1, &wc);
-    if (poll_result > 0)
-      out_signaled -= 1;
+    if (poll_result > 0){
+      if(wc.status & IBV_WC_RECV){
+        poll_result = 0;
+      } else {
+        out_signaled -= 1;
+      }
+    }
     return std::make_pair(poll_result,wc);
   }
 
