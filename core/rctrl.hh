@@ -4,6 +4,8 @@
 #include "qps/mod.hh"
 
 #include "./bootstrap/srpc.hh"
+#include "../core/nordma.hh"
+#include "qps/wrappers.hh"
 
 #include <atomic>
 
@@ -30,7 +32,10 @@ public:
   qp::QPFactory registered_qps;
   qp::DCFactory registered_dcs;
   Factory<nic_id_t, RNic> opened_nics;
-  // Factory<std::string, ibv_cq> rc_recv_cqs;
+
+  Factory<nic_id_t, qp::ibv_cq_wrapper> recv_cqs; // one nic one cq among all qps
+  Factory<nic_id_t, qp::ibv_srq_wrapper> registered_srqs; // one nic one srq among all qps
+  Factory<nic_id_t, nordma::nordma_resources> nordma_resources; // one nic one nordma_resource among all qps
 
   bootstrap::SRpcHandler rpc;
 
@@ -57,6 +62,9 @@ public:
         proto::FetchDCAttr,
         std::bind(&RCtrl::fetch_dc_attr_wrapper, this, std::placeholders::_1)));
 #endif
+    RDMA_ASSERT(rpc.register_handler(
+        proto::CreateRCRecv,
+        std::bind(&RCtrl::rc_recv_handler, this, std::placeholders::_1)));
   }
 
   ~RCtrl() {
@@ -96,6 +104,12 @@ public:
     }
     RDMA_LOG(INFO) << "stop with :" << total_reqs << " processed.";
     return nullptr; // nothing should return
+  }
+
+  void create_and_reg_nordma_resources(nic_id_t nic_id, struct nordma::nordma_resource_opts *opts) {
+    nordma::nordma_resources *nordma_resource = new nordma::nordma_resources(opts);
+
+    nordma_resources.reg(nic_id, Arc<nordma::nordma_resources>(nordma_resource));
   }
 
   // handlers of the dameon call
@@ -257,6 +271,95 @@ private:
   Err:
     return ::rdmaio::Marshal::dump<proto::RCReply>(
         {.status = proto::CallbackStatus::ConnectErr});
+  }
+
+
+  /*!
+    The handler for creating a QP which is ready for recv.
+    This handler should register with RCtrl (defined in ../rctrl.hh).
+    \note: the implementation is similar to the RCtrl's rc_handler,
+    but additionally allocate a RecvEntries<R> for the QP.
+  */
+   ByteBuffer rc_recv_handler(const ByteBuffer &b) {
+
+    auto rc_req_o = ::rdmaio::Marshal::dedump<proto::RCReq>(b);
+    if (!rc_req_o)
+      goto WA;
+    {
+      auto rc_req = rc_req_o.value();
+
+      // 1. sanity check the request
+      if (!(rc_req.whether_create == static_cast<u8>(1) ||
+            rc_req.whether_create != static_cast<u8>(0)))
+        goto WA;
+
+      // 1. check whether we need to create the QP
+      u64 key = 0;
+      if (rc_req.whether_create == 1) {
+        // 1.0 find the Nic to create this QP
+        auto nic = opened_nics.query(rc_req.nic_id);
+        if (!nic)
+          goto WA; // failed to find Nic
+
+        // 1.1 check whether we are able to use the registered cq
+        ibv_cq *cq = nullptr;
+        if (rc_req.whether_cq == 1) {
+          auto recv_c_res = recv_cqs.query(rc_req.nic_id);
+          if (!recv_c_res)
+            goto CQNotFound;
+          else
+            cq = recv_c_res.value().get()->cq;
+        } else {
+          goto WA;
+        }
+
+        ibv_srq *srq = nullptr;
+        if (rc_req.whether_srq == 1) {
+          auto srq_c_res = registered_srqs.query(rc_req.nic_id);
+          if (!srq_c_res)
+            goto SRQNotFound;
+          else
+            srq = srq_c_res.value().get()->srq;
+        } else {
+          goto WA;
+        }
+
+        // 1.2 try to create and register this QP
+        auto rc = qp::RC::create(nic.value(), rc_req.config, cq, true, srq).value();
+        auto rc_status = registered_qps.reg(rc_req.name, rc);
+
+        if (!rc_status) {
+          // clean up
+          goto WA;
+        }
+
+        // 1.3 finally we connect the QP
+        if (rc->connect(rc_req.attr) != IOCode::Ok) {
+          // in connect error
+          registered_qps.dereg(rc_req.name, rc_status.value());
+          goto WA;
+        }
+        key = rc_status.value();
+
+        // 1.4 this QP is done, alloc the recv entries would be done in the init srq stage
+      }
+
+      // 2. fetch the QP result
+      return fetch_qp_attr(rc_req, key);
+    }
+    // Error handling cases:
+    WA: // wrong arg
+        return ::rdmaio::Marshal::dump<proto::RCReply>(
+            {.status = proto::CallbackStatus::WrongArg});
+    Err:
+        return ::rdmaio::Marshal::dump<proto::RCReply>(
+            {.status = proto::CallbackStatus::ConnectErr});
+    CQNotFound:
+        return ::rdmaio::Marshal::dump<proto::RCReply>(
+            {.status = proto::CallbackStatus::CQNotFound});
+    SRQNotFound:
+        return ::rdmaio::Marshal::dump<proto::RCReply>(
+            {.status = proto::CallbackStatus::SRQNotFound});
   }
 };
 

@@ -56,6 +56,7 @@ public:
   struct ibv_qp *qp = nullptr;
   struct ibv_cq *cq = nullptr;
   struct ibv_cq *recv_cq = nullptr;
+  struct ibv_srq *srq = nullptr;
 
   // #of outsignaled RDMA requests
   usize out_signaled = 0;

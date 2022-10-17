@@ -7,7 +7,7 @@
 #define TEST_TIME_SEC       30
 #define DOORBELL_BATCHING   16
 #define PIPELINE
-#define QP_NUM              2
+#define QP_NUM              1
 
 #define LOCAL_NIC(a) ((a) % NIC_NUM)
 #define REMOTE_NIC(a) ((a) % NIC_NUM)

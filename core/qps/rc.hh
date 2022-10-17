@@ -65,7 +65,7 @@ public:
      }
   */
 private:
-  RC(Arc<RNic> nic, const QPConfig &config,ibv_cq *recv_cq = nullptr) : Dummy(nic), my_config(config) {
+  RC(Arc<RNic> nic, const QPConfig &config,ibv_cq *recv_cq = nullptr, bool same_cq = false, ibv_srq *srq = nullptr) : Dummy(nic), my_config(config) {
     /*
       It takes 3 steps to create an RC QP during the initialization
       according to the RDMA programming mannal.
@@ -74,23 +74,29 @@ private:
       Finally, we change the qp to read_to_init status.
      */
     // 1 cq
-    auto res = Impl::create_cq(nic, my_config.max_send_sz());
-    if (res != IOCode::Ok) {
-      RDMA_LOG(4) << "Error on creating CQ: " << std::get<1>(res.desc);
-      return;
+    if(same_cq == false){
+      auto res = Impl::create_cq(nic, my_config.max_send_sz());
+      if (res != IOCode::Ok) {
+        RDMA_LOG(4) << "Error on creating CQ: " << std::get<1>(res.desc);
+        return;
+      }
+      this->cq = std::get<0>(res.desc);
+    } else {
+      RDMA_ASSERT(recv_cq != nullptr);
+      this->cq = recv_cq;
     }
-    this->cq = std::get<0>(res.desc);
 
     // FIXME: we donot sanity check the the incoming recv_cq
     // The choice is that the recv cq could be shared among other QPs
     // shall we replace this with smart pointers ?
     this->recv_cq = recv_cq;
+    this->srq = srq;
 
     // 2 qp
     auto res_qp =
-        Impl::create_qp(nic, IBV_QPT_RC, my_config, this->cq, this->recv_cq);
+        Impl::create_qp(nic, IBV_QPT_RC, my_config, this->cq, this->recv_cq, this->srq);
     if (res_qp != IOCode::Ok) {
-      RDMA_LOG(4) << "Error on creating QP: " << std::get<1>(res.desc);
+      RDMA_LOG(4) << "Error on creating QP: " << std::get<1>(res_qp.desc);
       return;
     }
     this->qp = std::get<0>(res_qp.desc);
@@ -106,8 +112,10 @@ private:
 public:
   static Option<Arc<RC>> create(Arc<RNic> nic,
                                 const QPConfig &config = QPConfig(),
-                                ibv_cq *recv_cq = nullptr) {
-    auto res = Arc<RC>(new RC(nic, config,recv_cq));
+                                ibv_cq *recv_cq = nullptr,
+                                bool same_cq = false,
+                                ibv_srq *srq = nullptr) {
+    auto res = Arc<RC>(new RC(nic, config, recv_cq , same_cq, srq));
     if (res->valid()) {
       return Option<Arc<RC>>(std::move(res));
     }

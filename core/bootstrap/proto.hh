@@ -19,6 +19,7 @@ enum RCtrlBinderIdType : rpc_id_t {
   CreateRCM,     // create an RC which uses message (for two-sided)
   DeleteRC,
   FetchQPAttr,  // fetch a created QP's attr. useful for UD QP
+  CreateRCRecv,  // create an RC which uses message (for two-sided), with srq in server, and shared cq amoung all qps
 #ifdef DCT
   FetchDCAttr,  // fetch a DC attr. used for DCT
 #endif
@@ -32,6 +33,8 @@ enum CallbackStatus : u8 {
   WrongArg,
   ConnectErr,
   AuthErr,
+  SRQNotFound,
+  CQNotFound
 };
 
 /*!
@@ -67,6 +70,8 @@ struct __attribute__((packed)) RCReq {
 
   u8 whether_create = 0; // 1: create the QP, 0 only query the QP attr
   u8 whether_recv   = 0; // 1: create with the recv_cq specified by the *name_recv*, 0 not
+  u8 whether_srq   = 0; // 1: create with the srq specified by the *nic_id*, 0 not
+  u8 whether_cq   = 0; // 1: create with the cq specified by the *nic_id*, 0 not
 
   // if whether_create = 1, uses the following parameter to create the QP
   ::rdmaio::nic_id_t nic_id;

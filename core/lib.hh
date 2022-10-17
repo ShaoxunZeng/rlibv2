@@ -271,6 +271,84 @@ public:
     return ::rdmaio::Err(std::make_pair(err_str, temp_key));
   }
 
+  Result<cc_rc_ret_t> cc_rc_recv(const std::string &qp_name,
+                                const Arc<::rdmaio::qp::RC> rc,
+                                const ::rdmaio::nic_id_t &nic_id,
+                                const ::rdmaio::qp::QPConfig &config,
+                                const double &timeout_usec = 1000000) {
+
+    auto err_str = std::string("unknown error");
+    u64 temp_key = 0;
+
+    if (unlikely(qp_name.size() > ::rdmaio::qp::kMaxQPNameLen)) {
+      err_str = err_name_to_long;
+      goto ErrCase;
+    }
+
+    {
+      proto::RCReq req = {};
+      memset(&req, 0, sizeof(req));
+      memcpy(req.name, qp_name.data(), qp_name.size());
+
+      req.whether_create = 1;
+      req.whether_srq = 1;
+      req.whether_cq = 1;
+      
+      req.nic_id = nic_id;
+      req.config = config;
+      req.attr = rc->my_attr();
+
+      auto res = rpc.call(proto::CreateRCRecv,
+                          ::rdmaio::Marshal::dump<proto::RCReq>(req));
+
+      // FIXME: below are the same as cc_rc(); maybe refine in a more elegant
+      // form
+      if (unlikely(res != IOCode::Ok)) {
+        err_str = res.desc;
+        goto ErrCase;
+      }
+
+      auto res_reply = rpc.receive_reply(timeout_usec);
+
+      if (res_reply == IOCode::Ok) {
+        try {
+          auto qp_reply =
+              ::rdmaio::Marshal::dedump<RCReply>(res_reply.desc).value();
+          switch (qp_reply.status) {
+          case proto::CallbackStatus::Ok: {
+            auto ret = rc->connect(qp_reply.attr);
+            if (ret != IOCode::Ok) {
+              err_str = ret.desc;
+              goto ErrCase;
+            }
+            auto key = qp_reply.key;
+            return ::rdmaio::Ok(std::make_pair(std::string(""), key));
+          }
+          case proto::CallbackStatus::ConnectErr:
+            err_str = "Remote connect error";
+            goto ErrCase;
+          case proto::CallbackStatus::WrongArg:
+            err_str = "Wrong arguments, possible the QP has exsists";
+            goto ErrCase;
+          case proto::CallbackStatus::SRQNotFound:
+            err_str = "SRQ not found";
+            goto ErrCase;
+          case proto::CallbackStatus::CQNotFound:
+            err_str = "CQ not found";
+            goto ErrCase;
+          default:
+            err_str = err_unknown_status;
+          }
+        } catch (std::exception &e) {
+          err_str = err_decode_reply;
+        }
+      }
+    }
+
+  ErrCase:
+    return ::rdmaio::Err(std::make_pair(err_str, temp_key));
+  }
+
   /*!
     Fetch remote MR identified with "id" at remote machine of this
     connection manager, store the result in the "attr".

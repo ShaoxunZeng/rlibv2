@@ -84,7 +84,7 @@ public:
     qp_attr.sq_psn = config.sq_psn;
     qp_attr.timeout = config.timeout;
     qp_attr.retry_cnt = 7;
-    qp_attr.rnr_retry = 7;
+    qp_attr.rnr_retry = 0; // receive not ready
     qp_attr.max_rd_atomic = config.max_rd_atomic;
     qp_attr.max_dest_rd_atomic = config.max_dest_rd_atomic;
 
@@ -116,7 +116,8 @@ public:
   static CreateQPRes_t create_qp(Arc<RNic> nic, ibv_qp_type type,
                                  const QPConfig &config,
                                  ibv_cq *cq, // send cq
-                                 ibv_cq *recv_cq = nullptr) {
+                                 ibv_cq *recv_cq = nullptr,
+                                 ibv_srq *srq = nullptr) {
 
     if (cq == nullptr) {
       return Err(std::make_pair<ibv_qp *, std::string>(nullptr,
@@ -131,11 +132,12 @@ public:
 
     qp_init_attr.send_cq = cq;
     qp_init_attr.recv_cq = recv_cq;
+    qp_init_attr.srq = srq;
     qp_init_attr.qp_type = type;
     qp_init_attr.sq_sig_all = 0;
 
     qp_init_attr.cap.max_send_wr = config.max_send_sz();
-    qp_init_attr.cap.max_recv_wr = config.max_recv_sz();
+    qp_init_attr.cap.max_recv_wr = config.max_recv_sz(); /* would be invalid when srq is set */
     qp_init_attr.cap.max_send_sge = 1;
     qp_init_attr.cap.max_recv_sge = 1;
     qp_init_attr.cap.max_inline_data = kMaxInlinSz;
@@ -155,6 +157,7 @@ public:
     attr.attr.max_wr = max_wr;
     attr.attr.max_sge = max_sge;
     auto srq = ibv_create_srq(nic->get_pd(), &attr);
+    RDMA_ASSERT(attr.attr.max_wr >= max_wr) << "attr.attr.max_wr == " << attr.attr.max_wr << " while max_wr == " << max_wr;
 
     if (srq == nullptr) {
       return Err(std::make_pair(srq, std::string(strerror(errno))));
